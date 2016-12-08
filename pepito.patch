@@ -1,0 +1,107 @@
+diff -Naur tmp/src/daemon.c patch/src/daemon.c
+--- tmp/src/daemon.c	2016-05-03 05:33:18.618045309 +0200
++++ patch/src/daemon.c	2016-05-03 04:45:05.981414140 +0200
+@@ -65,6 +65,7 @@
+   FILE*			pidFile;
+   pid_t			pid;
+ 
++  umask(566);
+   if (!(pidFile = fopen("pepito.pid", "w"))) {
+     fprintf(stderr, "Cannot save process id.\n" \
+ 	    "Exiting\n");
+diff -Naur tmp/src/main.c patch/src/main.c
+--- tmp/src/main.c	2016-05-03 05:33:18.618045309 +0200
++++ patch/src/main.c	2016-05-03 05:31:06.531769232 +0200
+@@ -57,11 +57,13 @@
+   char			*logMessage;
+   int			isUser = 0;
+   int			isAdmin = 0;
+-  int			i;
++  unsigned int		i;
+ 
++  if (!password)
++    return NOBODY;
+   if (!strcmp(password, userPassword))
+     isUser = 1;
+-  strcpy(savePassword, password);
++  strncpy(savePassword, password, 64);
+ 
+   for (i = 0; password[i]; ++i)
+     password[i] ^= xorKey;
+@@ -86,7 +88,7 @@
+ changeUserPassword(char *password)
+ {
+   if (password) {
+-    strcpy(userPassword, password);
++    strncpy(userPassword, password, 512);
+     sendLogMessage(PASSWD_CHANGE);
+   }
+ }
+@@ -99,7 +101,7 @@
+   if (password) {
+     for (i = 0; password[i]; ++i)
+       password[i] ^= xorKey;
+-    strcpy(adminPassword, password);
++    strncpy(adminPassword, password, 512);
+     sendLogMessage(PASSWD_CHANGE);
+   }
+ }
+@@ -275,6 +277,11 @@
+       return -1;
+     }
+     if (tab_recipes[id].quantity > 0) {
++      if (money > 2147483647 - 10) {
++	snprintf(msg, sizeof(msg), "you have too much money, aren't you a cheater\n");
++        sendLogMessage(msg);
++	return -1;
++	}
+       tab_recipes[id].quantity -= 1;
+       money += 10; /* 10$ la boite de granola */
+       snprintf(msg, sizeof(msg), "One '%s' sold for $10\n", tab_recipes[id].name);
+@@ -295,8 +302,8 @@
+   int			i;
+   char			*ingredientName;
+   int			amount;
+-  char			log[128];
+   char			*password = NULL;
++  FILE			*log;
+ 
+   password = getStr(&packetPtr, &packetSize);
+   if (checkPassword(password) == ADMIN) {
+@@ -313,9 +320,13 @@
+ 	money -= 2 * amount;
+ 	stock[i].quantity += amount;
+ 	sendLogMessage(INGREDIENT_BOUGHT);
+-	sprintf(log, "echo \"%s was bought\" >> log", ingredientName);
++	if (!(log = fopen("log", "a+"))) {
++           fprintf(stderr, "Cannot open log.\nExiting\n");
++           return -1;
++	}
++	fprintf(log, "%s was bought", ingredientName);
++	fclose(log);
+ 	free(ingredientName);
+-	system(log);
+ 	return amount;
+       }
+     }
+@@ -350,7 +361,7 @@
+   int			cmdId;
+ 
+   cmdId = getNumber(&packetPtr, &packetSize);
+-  if (cmdId > (int)HANDLER_LEN)
++  if (cmdId > (int)HANDLER_LEN || cmdId <= 0)
+     fprintf(stderr, "ID (%i) out of range.\n", cmdId);
+   else
+     handlerTab[cmdId](packetPtr, packetSize);
+diff -Naur tmp/src/network.c patch/src/network.c
+--- tmp/src/network.c	2016-05-03 05:33:18.618045309 +0200
++++ patch/src/network.c	2016-05-03 04:46:34.053490037 +0200
+@@ -71,7 +71,7 @@
+ sendLogMessage(char *msg)
+ {
+   write(client, msg, strlen(msg));
+-  fprintf(stderr, msg);
++  fprintf(stderr, "%s", msg);
+ }
+ 
+ void

@@ -1,0 +1,18 @@
+deamon.c :
+ligne 68 le fichier "pepito.pid" n'est pas protégé contre réécritur utiliser un umask() avec les droits 00600 avant (tout de même exploitable avec des liens symboliques)
+
+main.c :
+ligne 62 et 68 possibilité de segfault si password est NULL
+ligne 64 stack buffer overflow peux entrainner la faille -> ligne 75 pas encore d'idées sur quelle faille, à décider
+ligne 66 possibilité de int overflow dans le but de mettre la valeur de isAdmin à 1
+ligne 89 et 102  statck buffer overflow
+ligne 279 possibilité de int overflow money (money doit être <= int - 10)
+ligne 316 statck buffer overflow (si ingredientName > 128 - 25)
+ligne 316 -> ligne 318 utilisation de system (en générale une mauvaise idée) ici l'on peut changer la variable PATH afin d'éxécuter sa propre command echo (préalablement modifié)
+ligne 352 getNumber peut retourner un nombre négatif -> ligne 356 possibilité d'écrire plus haut que le tableau handlertab dans la mémoire
+
+network.c :
+ligne 74 format strings (faille printf)
+
+utils.c :
+utilisez de vrais fonctions et pas des pseudos réplicats sensés brain l'utilisateur
